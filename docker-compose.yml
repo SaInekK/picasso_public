@@ -1,0 +1,55 @@
+version: '3.3'
+
+services:
+  web:
+    build: ./app
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./app/:/usr/src/app/
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.dev
+    depends_on:
+      - db
+    tty: true
+
+  db:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./appdata/postgres:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=picasso
+
+  redis:
+    image: redis:latest
+    command: redis-server --port 6379
+    container_name: redis
+    ports:
+      - "6379:6379"
+    depends_on:
+      - db
+
+  celery:
+    build: ./app
+    command: celery -A config.celery --workdir=. worker -l info
+    volumes:
+      - static_volume:/static_volume/
+      - media_volume:/media_volume/
+      - ./app/:/usr/src/app/
+    environment:
+      - CELERY_BROKER=redis://redis:6379/0
+      - CELERY_BACKEND=redis://redis:6379/0
+    env_file:
+      - .env.dev
+    depends_on:
+      - redis
+
+volumes:
+#  postgres_data:
+  static_volume:
+  media_volume:
